@@ -132,15 +132,6 @@ ORDER BY weightedFollowers DESC, name DESC
 <slide>
 <h3>CLOSENESS CENTRALITY</h3>
 
-<pre class = "code runnable">
-CALL gds.beta.closeness.stream('myGraph')
-YIELD nodeId, score
-RETURN gds.util.asNode(nodeId).name AS id, score
-ORDER BY score DESC
-</pre>
-</slide>
-
-<slide>
 Limpiamos el espacio de trabajo: 
 
 <pre class = "code runnable">
