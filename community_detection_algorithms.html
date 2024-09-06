@@ -1,0 +1,305 @@
+<html>
+
+
+<slide>
+<h3>TRIANGLE COUNT</h3>
+
+En este ejemplo se  demostrará la forma de correr el algoritmo "Triangle Count" para detección de comunidades. 
+Primero se creará una pequeña red social, con nodos conectados con cierto patrón. 
+
+
+<pre class="code runnable">
+CREATE
+  (alice:Person {name: 'Alice'}),
+  (michael:Person {name: 'Michael'}),
+  (karin:Person {name: 'Karin'}),
+  (chris:Person {name: 'Chris'}),
+  (will:Person {name: 'Will'}),
+  (mark:Person {name: 'Mark'}),
+
+  (michael)-[:KNOWS]->(karin),
+  (michael)-[:KNOWS]->(chris),
+  (will)-[:KNOWS]->(michael),
+  (mark)-[:KNOWS]->(michael),
+  (mark)-[:KNOWS]->(will),
+  (alice)-[:KNOWS]->(michael),
+  (will)-[:KNOWS]->(chris),
+  (chris)-[:KNOWS]->(karin)
+</pre>
+</slide>
+
+<slide>
+<h3>Almacenamiento del grafo en el catálogo de grafos</h3>
+
+La siguiente consulta crea un grafo con proyección nativa y lo guarda en el catálogo de grafos. Notar que se está definiendo la dirección de las relaciones como "undirected", es decir, sin dirección. 
+
+<pre class="code runnable">
+CALL gds.graph.project(
+  'myGraphT',
+  'Person',
+  {
+    KNOWS: {
+      orientation: 'UNDIRECTED'
+    }
+  }
+)
+</pre>
+</slide>
+
+<slide>
+<h3>Estimación de memoria</h3>
+
+Para estimar los requerimientos de memoria que se necesitan para correr el algoritmo, utilizamos la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.triangleCount.write.estimate('myGraphT', { writeProperty: 'triangleCount' })
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+</pre>
+</slide>
+
+<slide>
+<h3>Para correr el algoritmo</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.triangleCount.stream('myGraphT')
+YIELD nodeId, triangleCount
+RETURN gds.util.asNode(nodeId).name AS name, triangleCount
+ORDER BY triangleCount DESC
+</pre>
+
+</slide>
+
+
+<slide>
+<h3>Estadísticas</h3>
+
+La siguiente consulta corre el algoritmo y regresa el resultado de forma estadística, en este caso, es el conteo del número de comunidades encontradas: 
+
+<pre class="code runnable">
+CALL gds.triangleCount.stats('myGraphT')
+YIELD globalTriangleCount, nodeCount
+</pre>
+
+</slide>
+
+<slide>
+<h3>Listado de Triángulos</h3>
+
+La siguiente consulta calcula los IDs de nodo para cada triangulo, y regresa la propiedad 'nombre' de los nodos. 
+
+<pre class="code runnable">
+CALL gds.alpha.triangles('myGraphT')
+YIELD nodeA, nodeB, nodeC
+RETURN
+  gds.util.asNode(nodeA).name AS nodeA,
+  gds.util.asNode(nodeB).name AS nodeB,
+  gds.util.asNode(nodeC).name AS nodeC
+</pre>
+
+</slide>
+
+<slide>
+<h3>Borrando los ejercicios anteriores</h3>
+De nuevo... 
+<pre class="code runnable">
+MATCH (n) DETACH DELETE n
+</pre>
+
+</slide>
+
+<slide>
+<h3>LABEL PROPAGATION</h3>
+
+En este ejemplo se  demostrará la forma de correr el algoritmo de propagación de etiquets. 
+
+<pre class="code runnable">
+CREATE
+  (alice:User {name: 'Alice', seed_label: 52}),
+  (bridget:User {name: 'Bridget', seed_label: 21}),
+  (charles:User {name: 'Charles', seed_label: 43}),
+  (doug:User {name: 'Doug', seed_label: 21}),
+  (mark:User {name: 'Mark', seed_label: 19}),
+  (michael:User {name: 'Michael', seed_label: 52}),
+
+  (alice)-[:FOLLOW {weight: 1}]->(bridget),
+  (alice)-[:FOLLOW {weight: 10}]->(charles),
+  (mark)-[:FOLLOW {weight: 1}]->(doug),
+  (bridget)-[:FOLLOW {weight: 1}]->(michael),
+  (doug)-[:FOLLOW {weight: 1}]->(mark),
+  (michael)-[:FOLLOW {weight: 1}]->(alice),
+  (alice)-[:FOLLOW {weight: 1}]->(michael),
+  (bridget)-[:FOLLOW {weight: 1}]->(alice),
+  (michael)-[:FOLLOW {weight: 1}]->(bridget),
+  (charles)-[:FOLLOW {weight: 1}]->(doug)
+</pre>
+</slide>
+
+<slide>
+<h3>Almacenamiento del grafo en el catálogo de grafos</h3>
+
+La siguiente consulta crea un grafo con proyección nativa y lo guarda en el catálogo de grafos. Notar que se está definiendo la dirección de las relaciones como "undirected", es decir, sin dirección. 
+
+<pre class="code runnable">
+CALL gds.graph.project(
+    'myGraphLP',
+    'User',
+    'FOLLOW',
+    {
+        nodeProperties: 'seed_label',
+        relationshipProperties: 'weight'
+    }
+)
+</pre>
+</slide>
+
+<slide>
+<h3>Estimación de memoria</h3>
+
+Para estimar los requerimientos de memoria que se necesitan para correr el algoritmo, utilizamos la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.labelPropagation.write.estimate('myGraphLP', { writeProperty: 'community' })
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+</pre>
+</slide>
+
+<slide>
+<h3>Para correr el algoritmo</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.labelPropagation.stream('myGraphLP')
+YIELD nodeId, communityId AS Community
+RETURN gds.util.asNode(nodeId).name AS Name, Community
+ORDER BY Community, Name
+</pre>
+
+</slide>
+
+
+<slide>
+<h3>Estadísticas</h3>
+
+La siguiente consulta corre el algoritmo y regresa el resultado de forma estadística, en este caso, es el conteo del número de comunidades encontradas: 
+
+<pre class="code runnable">
+CALL gds.labelPropagation.stats('myGraphLP')
+YIELD communityCount, ranIterations, didConverge
+</pre>
+
+</slide>
+
+<slide>
+<h3>Borrando los ejercicios anteriores</h3>
+
+<pre class="code runnable">
+MATCH (n) DETACH DELETE n
+</pre>
+</slide>
+
+
+
+<slide>
+<h3>LOUVAIN</h3>
+
+En este ejemplo se  demostrará la forma de correr el algoritmo de Louvain para detección de comunidades. 
+Primero se creará una pequeña red social, con nodos conectados con cierto patrón. 
+
+Este grafo cuenta con dos clusters de usuarios, los cuales se encuentran conectados de forma 'cercana'. Entre estos dos clusters hay un solo "eje" que los conecta. 
+Las relaciones que conectan a los nodos, tienen la propiedad de weight (peso), la cual determina qué tan fuerte es una relación. 
+
+<pre class="code runnable">
+CREATE
+  (nAlice:User {name: 'Alice', seed: 42}),
+  (nBridget:User {name: 'Bridget', seed: 42}),
+  (nCharles:User {name: 'Charles', seed: 42}),
+  (nDoug:User {name: 'Doug'}),
+  (nMark:User {name: 'Mark'}),
+  (nMichael:User {name: 'Michael'}),
+
+  (nAlice)-[:LINK {weight: 1}]->(nBridget),
+  (nAlice)-[:LINK {weight: 1}]->(nCharles),
+  (nCharles)-[:LINK {weight: 1}]->(nBridget),
+
+  (nAlice)-[:LINK {weight: 5}]->(nDoug),
+
+  (nMark)-[:LINK {weight: 1}]->(nDoug),
+  (nMark)-[:LINK {weight: 1}]->(nMichael),
+  (nMichael)-[:LINK {weight: 1}]->(nMark);
+</pre>
+</slide>
+
+<slide>
+<h3>Almacenamiento del grafo en el catálogo de grafos</h3>
+
+La siguiente consulta crea un grafo con proyección nativa y lo guarda en el catálogo de grafos. Notar que se está definiendo la dirección de las relaciones como "undirected", es decir, sin dirección. 
+
+<pre class="code runnable">
+CALL gds.graph.project(
+    'myGraphL',
+    'User',
+    {
+        LINK: {
+            orientation: 'UNDIRECTED'
+        }
+    },
+    {
+        nodeProperties: 'seed',
+        relationshipProperties: 'weight'
+    }
+)
+</pre>
+</slide>
+
+<slide>
+<h3>Estimación de memoria</h3>
+
+Para estimar los requerimientos de memoria que se necesitan para correr el algoritmo, utilizamos la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.louvain.write.estimate('myGraphL', { writeProperty: 'community' })
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+</pre>
+</slide>
+
+<slide>
+<h3>Para correr el algoritmo</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.louvain.stream('myGraphL')
+YIELD nodeId, communityId, intermediateCommunityIds
+RETURN gds.util.asNode(nodeId).name AS name, communityId, intermediateCommunityIds
+ORDER BY name ASC
+</pre>
+
+</slide>
+
+
+<slide>
+<h3>Estadísticas</h3>
+
+La siguiente consulta corre el algoritmo y regresa el resultado de forma estadística, en este caso, es el conteo del número de comunidades encontradas: 
+
+<pre class="code runnable">
+CALL gds.louvain.stats('myGraphL')
+YIELD communityCount
+</pre>
+
+</slide>
+
+<slide>
+<h3>Borrando los ejercicios anteriores</h3>
+
+<pre class="code runnable">
+MATCH (n) DETACH DELETE n
+</pre>
+
+</slide>
+
+
+</html>

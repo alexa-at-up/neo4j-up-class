@@ -1,0 +1,404 @@
+<html>
+
+<slide>
+<h3>DEGREE CENTRALITY</h3>
+Creación de una base de datos para ilustrar una mini-red social. 
+
+<pre class = "code runnable">
+CREATE
+  (alice:User {name: 'Alice'}),
+  (bridget:User {name: 'Bridget'}),
+  (charles:User {name: 'Charles'}),
+  (doug:User {name: 'Doug'}),
+  (mark:User {name: 'Mark'}),
+  (michael:User {name: 'Michael'}),
+
+  (alice)-[:FOLLOWS {score: 1}]->(doug),
+  (alice)-[:FOLLOWS {score: -2}]->(bridget),
+  (alice)-[:FOLLOWS {score: 5}]->(charles),
+  (mark)-[:FOLLOWS {score: 1.5}]->(doug),
+  (mark)-[:FOLLOWS {score: 4.5}]->(michael),
+  (bridget)-[:FOLLOWS {score: 1.5}]->(doug),
+  (charles)-[:FOLLOWS {score: 2}]->(doug),
+  (michael)-[:FOLLOWS {score: 1.5}]->(doug)
+</pre>
+</slide>
+
+
+<slide>
+Un query sencillo para contar seguidores y seguidos: 
+
+<pre class = "code runnable">
+MATCH (u:User)
+RETURN u.name AS name,
+size((u)-[:FOLLOWS]-()) AS degree,
+size((u)-[:FOLLOWS]->()) AS follows,
+size((u)<-[:FOLLOWS]-()) AS followers
+</pre>
+
+Un query sencillo para contar seguidores tomando en cuenta el peso en su propiedad:
+
+<pre class = "code runnable">
+MATCH (u:User)<-[f:FOLLOWS]-()
+RETURN u.name as name, 
+sum(f.score) as f_weight
+ORDER BY f_weight DESC
+</pre>
+</slide>
+
+
+<slide>
+<h3>GRAPH CATALOG</h3>
+ La siguiente consulta (o enunciado) "crea" un (sub)grafo, usando una proyección nativa y lo almacena en el catálogo de grafos bajo el nombre "myGraph".
+
+<pre class = "code runnable">
+CALL gds.graph.project(
+  'myGraph',
+  'User',
+  {
+    FOLLOWS: {
+      orientation: 'REVERSE',
+      properties: ['score']
+    }
+  }
+)
+</pre>
+</slide>
+
+<slide>
+Para borrar un grafo del catálogo se puede correr el siguiente código: 
+
+<pre class = "code runnable">
+CALL gds.graph.drop('myGraph') YIELD graphName;
+</pre>
+</slide>
+
+<slide>
+<h3>Estimación de Memoria</h3>
+
+La siguiente consulta estimará la memoria necesaria para correr el algoritmo:
+<pre class = "code runnable">
+CALL gds.degree.write.estimate('myGraph', { writeProperty: 'degree' })
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+</pre>
+</slide>
+
+<slide>
+<h3>Resultados</h3>
+
+La siguiente consulta corre el algoritmo en modo "stream":
+
+<pre class = "code runnable">
+CALL gds.degree.stream('myGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS name, score AS followers
+ORDER BY followers DESC, name DESC
+</pre>
+</slide>
+
+<slide>
+<pre class = "code runnable">
+CALL gds.degree.stream(
+   'myGraph',
+   { orientation: 'REVERSE' }
+)
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS name, score AS followees
+ORDER BY followees DESC, name DESC
+</pre>
+</slide>
+
+<slide>
+<pre class = "code runnable">
+CALL gds.degree.stats('myGraph')
+YIELD centralityDistribution
+RETURN centralityDistribution.min AS minimumScore, centralityDistribution.max AS maximumScore, centralityDistribution.mean AS meanScore
+</pre>
+</slide>
+
+<slide>
+<pre class = "code runnable">
+CALL gds.degree.stream(
+   'myGraph',
+   { relationshipWeightProperty: 'score' }
+)
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS name, score AS weightedFollowers
+ORDER BY weightedFollowers DESC, name DESC
+</pre>
+</slide>
+
+
+<slide>
+<h3>CLOSENESS CENTRALITY</h3>
+
+<pre class = "code runnable">
+CALL gds.beta.closeness.stream('myGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS id, score
+ORDER BY score DESC
+</pre>
+</slide>
+
+<slide>
+Limpiamos el espacio de trabajo: 
+
+<pre class = "code runnable">
+MATCH (n) DETACH DELETE n
+</pre>
+
+<pre class = "code runnable">
+CALL gds.graph.drop('myGraph') YIELD graphName;
+</pre>
+</slide>
+
+<slide>
+
+<pre class = "code runnable">
+CREATE (a:Node {id:"A"}),
+       (b:Node {id:"B"}),
+       (c:Node {id:"C"}),
+       (d:Node {id:"D"}),
+       (e:Node {id:"E"}),
+       (a)-[:LINK]->(b),
+       (b)-[:LINK]->(a),
+       (b)-[:LINK]->(c),
+       (c)-[:LINK]->(b),
+       (c)-[:LINK]->(d),
+       (d)-[:LINK]->(c),
+       (d)-[:LINK]->(e),
+       (e)-[:LINK]->(d);
+</pre>
+
+
+</slide>
+
+
+
+<slide>
+<pre class = "code runnable">
+CALL gds.graph.project('myGraph', 'Node', 'LINK')
+</pre>
+</slide>
+
+
+
+<slide>
+<pre class = "code runnable">
+CALL gds.beta.closeness.stream('myGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).id AS id, score
+ORDER BY score DESC
+</pre>
+</slide>
+
+<slide>
+<h3>Estadísticas</h3>
+
+La siguiente consulta regresa el resultado en forma de distribución o valores estadísticos: 
+
+<pre class = "code runnable">
+CALL gds.beta.closeness.stats('myGraph')
+YIELD centralityDistribution
+RETURN centralityDistribution.min AS minimumScore, centralityDistribution.max AS maximumScore, centralityDistribution.mean AS meanScore
+</pre>
+</slide>
+
+<slide>
+Limpiamos el espacio de trabajo: 
+<pre class = "code runnable">
+MATCH (n) DETACH DELETE n
+</pre>
+
+<pre class = "code runnable">
+CALL gds.graph.drop('myGraph') YIELD graphName;
+</pre>
+</slide>
+
+
+<slide>
+<pre class = "code runnable">
+CREATE
+  (alice:User {name: 'Alice'}),
+  (bob:User {name: 'Bob'}),
+  (carol:User {name: 'Carol'}),
+  (dan:User {name: 'Dan'}),
+  (eve:User {name: 'Eve'}),
+  (frank:User {name: 'Frank'}),
+  (gale:User {name: 'Gale'}),
+
+  (alice)-[:FOLLOWS {weight: 1.0}]->(carol),
+  (bob)-[:FOLLOWS {weight: 1.0}]->(carol),
+  (carol)-[:FOLLOWS {weight: 1.0}]->(dan),
+  (carol)-[:FOLLOWS {weight: 1.3}]->(eve),
+  (dan)-[:FOLLOWS {weight: 1.0}]->(frank),
+  (eve)-[:FOLLOWS {weight: 0.5}]->(frank),
+  (frank)-[:FOLLOWS {weight: 1.0}]->(gale);
+</pre>
+</slide>
+
+<slide>
+<pre class = "code runnable">
+CALL gds.graph.project('myGraph', 'User', {FOLLOWS: {properties: 'weight'}})
+</pre>
+</slide>
+
+<slide>
+<h3>Estimación de Memoria</h3>
+
+La siguiente consulta estimará la memoria necesaria para correr el algoritmo:
+<pre class = "code runnable">
+CALL gds.betweenness.write.estimate('myGraph', { writeProperty: 'betweenness' })
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+</pre>
+</slide>
+
+<slide>
+<pre class = "code runnable">
+CALL gds.betweenness.stream('myGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS name, score
+ORDER BY name ASC
+</pre>
+</slide>
+
+<slide>
+<pre class = "code runnable">
+CALL gds.betweenness.stats('myGraph')
+YIELD centralityDistribution
+RETURN centralityDistribution.min AS minimumScore, centralityDistribution.max AS maxScore, centralityDistribution.mean AS meanScore
+</pre>
+</slide>
+
+<slide>
+Limpiamos el espacio de trabajo: 
+<pre class = "code runnable">
+MATCH (n) DETACH DELETE n
+</pre>
+
+<pre class = "code runnable">
+CALL gds.graph.drop('myGraph') YIELD graphName;
+</pre>
+</slide>
+
+<slide>
+<h3>PAGERANK</h3>
+
+Creación de una base de datos para ilustrar el algoritmo PageRank.
+
+Este grafo representa ocho páginas, que se relacionan entre sí. Cada relación tiene una propiedad llamada weight (peso), la cual describe la importancia de la relación. 
+
+<pre class="code runnable">
+CREATE
+  (home:Page {name:'Home'}),
+  (about:Page {name:'About'}),
+  (product:Page {name:'Product'}),
+  (links:Page {name:'Links'}),
+  (a:Page {name:'Site A'}),
+  (b:Page {name:'Site B'}),
+  (c:Page {name:'Site C'}),
+  (d:Page {name:'Site D'}),
+
+  (home)-[:LINKS {weight: 0.2}]->(about),
+  (home)-[:LINKS {weight: 0.2}]->(links),
+  (home)-[:LINKS {weight: 0.6}]->(product),
+  (about)-[:LINKS {weight: 1.0}]->(home),
+  (product)-[:LINKS {weight: 1.0}]->(home),
+  (a)-[:LINKS {weight: 1.0}]->(home),
+  (b)-[:LINKS {weight: 1.0}]->(home),
+  (c)-[:LINKS {weight: 1.0}]->(home),
+  (d)-[:LINKS {weight: 1.0}]->(home),
+  (links)-[:LINKS {weight: 0.8}]->(home),
+  (links)-[:LINKS {weight: 0.05}]->(a),
+  (links)-[:LINKS {weight: 0.05}]->(b),
+  (links)-[:LINKS {weight: 0.05}]->(c),
+  (links)-[:LINKS {weight: 0.05}]->(d);
+</pre>
+
+</slide>
+
+<slide>
+<h3>Guardando el grafo en el catálogo de grafos</h3>
+
+La siguiente consulta (o enunciado) crea un grafo, usando una proyección nativa y lo almacena en el catálogo de grafos bajo el nombre "myGraph".
+
+<pre class="code runnable">
+CALL gds.graph.project(
+  'myGraph',
+  'Page',
+  'LINKS',
+  {
+    relationshipProperties: 'weight'
+  }
+)
+</pre>
+
+</slide>
+
+<slide>
+<h3>Estimación de Memoria</h3>
+
+La siguiente consulta estimará la memoria necesaria para correr el algoritmo:
+
+<pre class="code runnable">
+CALL gds.pageRank.write.estimate('myGraph', {
+  writeProperty: 'pageRank',
+  maxIterations: 20,
+  dampingFactor: 0.85
+})
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+</pre>
+
+</slide>
+
+
+<slide>
+
+<h3>Resultados</h3>
+
+La siguiente consulta corre el algoritmo en modo "stream":
+
+<pre class="code runnable">
+CALL gds.pageRank.stream('myGraph')
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS name, score
+ORDER BY score DESC, name ASC
+</pre>
+</slide>
+
+
+<slide>
+<h3>Estadísticas</h3>
+
+La siguiente consulta regresa el resultado en forma de distribución o valores estadísticos: 
+
+<pre class="code runnable">
+CALL gds.pageRank.stats('myGraph', {
+  maxIterations: 20,
+  dampingFactor: 0.85
+})
+YIELD centralityDistribution
+RETURN centralityDistribution.max AS max, centralityDistribution.min AS min, centralityDistribution.mean as mean
+</pre>
+</slide>
+
+<slide>
+
+<h3>Resultados</h3>
+
+La siguiente consulta corre el algoritmo en modo "stream":
+
+<pre class="code runnable">
+CALL gds.pageRank.stream('myGraph', {
+  maxIterations: 20,
+  dampingFactor: 0.85,
+  relationshipWeightProperty: 'weight'
+})
+YIELD nodeId, score
+RETURN gds.util.asNode(nodeId).name AS name, score
+ORDER BY score DESC, name ASC
+</pre>
+</slide>
+
+
+</html>

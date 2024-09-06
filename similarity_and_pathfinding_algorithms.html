@@ -1,0 +1,367 @@
+<html>
+
+
+<slide>
+<h3>NODE SIMILARITY</h3>
+
+En este ejemplo se demostrará la forma de correr el algoritmo de "Node Similarity" con los coeficientes de Jaccard y Superposición.
+
+Primero se creará una pequeña red social, con nodos conectados con cierto patrón. 
+
+
+<pre class="code runnable">
+CREATE
+  (alice:Person {name: 'Alice'}),
+  (bob:Person {name: 'Bob'}),
+  (carol:Person {name: 'Carol'}),
+  (dave:Person {name: 'Dave'}),
+  (eve:Person {name: 'Eve'}),
+  (guitar:Instrument {name: 'Guitar'}),
+  (synth:Instrument {name: 'Synthesizer'}),
+  (bongos:Instrument {name: 'Bongos'}),
+  (trumpet:Instrument {name: 'Trumpet'}),
+
+  (alice)-[:LIKES]->(guitar),
+  (alice)-[:LIKES]->(synth),
+  (alice)-[:LIKES {strength: 0.5}]->(bongos),
+  (bob)-[:LIKES]->(guitar),
+  (bob)-[:LIKES]->(synth),
+  (carol)-[:LIKES]->(bongos),
+  (dave)-[:LIKES]->(guitar),
+  (dave)-[:LIKES {strength: 1.5}]->(trumpet),
+  (dave)-[:LIKES]->(bongos);
+</pre>
+</slide>
+
+<slide>
+<h3>Almacenamiento del grafo en el catálogo de grafos</h3>
+
+La siguiente consulta crea un grafo con proyección nativa y lo guarda en el catálogo de grafos. Notar que se está tomando en cuenta los dos tipos de nodos y la relación "LIKES".
+
+<pre class="code runnable">
+CALL gds.graph.project(
+    'myGraph',
+    ['Person', 'Instrument'],
+    {
+        LIKES: {
+            properties: {
+                strength: {
+                    property: 'strength',
+                    defaultValue: 1.0
+                }
+            }
+        }
+    }
+);
+</pre>
+</slide>
+
+<slide>
+<h3>Estimación de memoria</h3>
+
+Para estimar los requerimientos de memoria que se necesitan para correr el algoritmo, utilizamos la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.nodeSimilarity.write.estimate('myGraph', {
+  writeRelationshipType: 'SIMILAR',
+  writeProperty: 'score'
+})
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+</pre>
+</slide>
+
+<slide>
+<h3>Para correr el algoritmo</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta, pero ¿qué métrica está utilizando?: 
+
+<pre class="code runnable">
+CALL gds.nodeSimilarity.stream('myGraph')
+YIELD node1, node2, similarity
+RETURN gds.util.asNode(node1).name AS Person1, gds.util.asNode(node2).name AS Person2, similarity
+ORDER BY similarity DESCENDING, Person1, Person2
+</pre>
+
+</slide>
+
+
+<slide>
+<h3>Para correr el algoritmo con Jaccard</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.nodeSimilarity.stream('myGraph', { similarityMetric: 'JACCARD' })
+YIELD node1, node2, similarity
+RETURN gds.util.asNode(node1).name AS Person1, gds.util.asNode(node2).name AS Person2, similarity
+ORDER BY similarity DESCENDING, Person1, Person2
+</pre>
+
+</slide>
+
+<slide>
+<h3>Para correr el algoritmo con Superposición</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.nodeSimilarity.stream('myGraph', { similarityMetric: 'OVERLAP' })
+YIELD node1, node2, similarity
+RETURN gds.util.asNode(node1).name AS Person1, gds.util.asNode(node2).name AS Person2, similarity
+ORDER BY similarity DESCENDING, Person1, Person2
+</pre>
+
+</slide>
+
+
+<slide>
+<h3>Estadísticas</h3>
+
+La siguientes consultas se corre el algoritmo y regresa el resultado de forma estadística: 
+
+<pre class="code runnable">
+CALL gds.nodeSimilarity.stats('myGraph')
+YIELD nodesCompared, similarityPairs
+</pre>
+
+<pre class="code runnable">
+CALL gds.nodeSimilarity.stats('myGraph', { similarityMetric: 'JACCARD' })
+YIELD nodesCompared, similarityPairs
+</pre>
+
+<pre class="code runnable">
+CALL gds.nodeSimilarity.stats('myGraph', { similarityMetric: 'OVERLAP' })
+YIELD nodesCompared, similarityPairs
+</pre>
+
+</slide>
+
+<slide>
+<h3>Borrando los ejercicios anteriores</h3>
+De nuevo... 
+<pre class="code runnable">
+MATCH (n) DETACH DELETE n
+</pre>
+
+<pre class="code runnable">
+CALL gds.graph.drop('myGraph') 
+YIELD graphName;
+</pre>
+
+</slide>
+
+<slide>
+<h3>K-NEAREST NEIGHBORS</h3>
+
+Se crea un conjunto de nodos y relaciones inicial.  
+
+<pre class="code runnable">
+CREATE (alice:Person {name: 'Alice', age: 24, lotteryNumbers: [1, 3], embedding: [1.0, 3.0]})
+CREATE (bob:Person {name: 'Bob', age: 73, lotteryNumbers: [1, 2, 3], embedding: [2.1, 1.6]})
+CREATE (carol:Person {name: 'Carol', age: 24, lotteryNumbers: [3], embedding: [1.5, 3.1]})
+CREATE (dave:Person {name: 'Dave', age: 48, lotteryNumbers: [2, 4], embedding: [0.6, 0.2]})
+CREATE (eve:Person {name: 'Eve', age: 67, lotteryNumbers: [1, 5], embedding: [1.8, 2.7]});
+</pre>
+</slide>
+
+<slide>
+<h3>Almacenamiento del grafo en el catálogo de grafos</h3>
+
+La siguiente consulta crea un grafo con proyección nativa y lo guarda en el catálogo de grafos. 
+
+<pre class="code runnable">
+CALL gds.graph.project(
+    'myGraph',
+    {
+        Person: {
+            properties: ['age','lotteryNumbers','embedding']
+        }
+    },
+    '*'
+);
+</pre>
+</slide>
+
+<slide>
+<h3>Estimación de memoria</h3>
+
+Para estimar los requerimientos de memoria que se necesitan para correr el algoritmo, utilizamos la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.knn.write.estimate('myGraph', {
+  nodeProperties: ['age'],
+  writeRelationshipType: 'SIMILAR',
+  writeProperty: 'score',
+  topK: 1
+})
+YIELD nodeCount, bytesMin, bytesMax, requiredMemory
+</pre>
+</slide>
+
+<slide>
+<h3>Para correr el algoritmo</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.knn.stream('myGraph', {
+    topK: 1,
+    nodeProperties: ['age'],
+    // The following parameters are set to produce a deterministic result
+    randomSeed: 1337,
+    concurrency: 1,
+    sampleRate: 1.0,
+    deltaThreshold: 0.0
+})
+YIELD node1, node2, similarity
+RETURN gds.util.asNode(node1).name AS Person1, gds.util.asNode(node2).name AS Person2, similarity
+ORDER BY similarity DESCENDING, Person1, Person2
+</pre>
+
+</slide>
+
+<slide>
+<h3>Para correr el algoritmo</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta: 
+
+<pre class="code runnable">
+CALL gds.knn.stream('myGraph', {
+    topK: 1,
+    nodeProperties: ['lotteryNumbers'],
+    // The following parameters are set to produce a deterministic result
+    randomSeed: 1337,
+    concurrency: 1,
+    sampleRate: 1.0,
+    deltaThreshold: 0.0
+})
+YIELD node1, node2, similarity
+RETURN gds.util.asNode(node1).name AS Person1, gds.util.asNode(node2).name AS Person2, similarity
+ORDER BY similarity DESCENDING, Person1, Person2
+</pre>
+
+</slide>
+
+
+<slide>
+<h3>Borrando los ejercicios anteriores</h3>
+De nuevo... 
+<pre class="code runnable">
+MATCH (n) DETACH DELETE n
+</pre>
+
+<pre class="code runnable">
+CALL gds.graph.drop('myGraph') 
+YIELD graphName;
+</pre>
+
+</slide>
+
+
+
+<slide>
+<h3>DIJKSTRA SOURCE-TARGET</h3>
+
+
+<pre class="code runnable">
+CREATE (a:Location {name: 'A'}),
+       (b:Location {name: 'B'}),
+       (c:Location {name: 'C'}),
+       (d:Location {name: 'D'}),
+       (e:Location {name: 'E'}),
+       (f:Location {name: 'F'}),
+       (a)-[:ROAD {cost: 50}]->(b),
+       (a)-[:ROAD {cost: 50}]->(c),
+       (a)-[:ROAD {cost: 100}]->(d),
+       (b)-[:ROAD {cost: 40}]->(d),
+       (c)-[:ROAD {cost: 40}]->(d),
+       (c)-[:ROAD {cost: 80}]->(e),
+       (d)-[:ROAD {cost: 30}]->(e),
+       (d)-[:ROAD {cost: 80}]->(f),
+       (e)-[:ROAD {cost: 40}]->(f);
+</pre>
+</slide>
+
+<slide>
+<h3>Almacenamiento del grafo en el catálogo de grafos</h3>
+
+
+<pre class="code runnable">
+CALL gds.graph.project(
+    'myGraph',
+    'Location',
+    'ROAD',
+    {
+        relationshipProperties: 'cost'
+    }
+)
+</pre>
+</slide>
+
+<slide>
+<h3>Estimación de memoria</h3>
+
+Para estimar los requerimientos de memoria que se necesitan para correr el algoritmo, utilizamos la siguiente consulta: 
+
+<pre class="code runnable">
+MATCH (source:Location {name: 'A'}), (target:Location {name: 'F'})
+CALL gds.shortestPath.dijkstra.write.estimate('myGraph', {
+    sourceNode: source,
+    targetNode: target,
+    relationshipWeightProperty: 'cost',
+    writeRelationshipType: 'PATH'
+})
+YIELD nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+RETURN nodeCount, relationshipCount, bytesMin, bytesMax, requiredMemory
+</pre>
+</slide>
+
+<slide>
+<h3>Para correr el algoritmo</h3>
+
+Se ejecuta el algoritmo con la siguiente consulta: 
+
+<pre class="code runnable">
+MATCH (source:Location {name: 'A'}), (target:Location {name: 'F'})
+CALL gds.shortestPath.dijkstra.stream('myGraph', {
+    sourceNode: source,
+    targetNode: target,
+    relationshipWeightProperty: 'cost'
+})
+YIELD index, sourceNode, targetNode, totalCost, nodeIds, costs, path
+RETURN
+    index,
+    gds.util.asNode(sourceNode).name AS sourceNodeName,
+    gds.util.asNode(targetNode).name AS targetNodeName,
+    totalCost,
+    [nodeId IN nodeIds | gds.util.asNode(nodeId).name] AS nodeNames,
+    costs,
+    nodes(path) as path
+ORDER BY index
+</pre>
+
+</slide>
+
+
+<slide>
+<h3>Crear una nueva relación para la ruta final:</h3>
+
+
+<pre class="code runnable">
+MATCH (source:Location {name: 'A'}), (target:Location {name: 'F'})
+CALL gds.shortestPath.dijkstra.write('myGraph', {
+    sourceNode: source,
+    targetNode: target,
+    relationshipWeightProperty: 'cost',
+    writeRelationshipType: 'PATH',
+    writeNodeIds: true,
+    writeCosts: true
+})
+YIELD relationshipsWritten
+RETURN relationshipsWritten
+</pre>
+
+</slide>
+
+
+</html>
